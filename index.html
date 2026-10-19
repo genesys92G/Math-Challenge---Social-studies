@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paleolithic Survival - 3D Caloric Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <!-- KaTeX for crisp mathematical fraction rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+    <style>
+        :root {
+            --stone-bg: #2d2a26;
+            --stone-border: #5c554d;
+            --earth-text: #fef0d8;
+        }
+        
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Inter', sans-serif;
+            color: var(--earth-text); overflow: hidden; background-color: #c8a97e;
+        }
+        .title-font { font-family: 'Caveat', cursive; padding-right: 10px; line-height: 1.2; }
+
+        /* START SCREEN */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(40, 20, 5, 0.8), rgba(20, 5, 0, 0.9)), url('image_025c64.jpg');
+            background-size: cover; background-position: center;
+            z-index: 2000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; transition: opacity 1s ease-in-out;
+        }
+
+        .gradient-title {
+            background: linear-gradient(90deg, #fcd34d, #f97316, #ef4444, #fcd34d);
+            background-size: 300% auto; color: transparent;
+            -webkit-background-clip: text; background-clip: text;
+            animation: gradientText 5s ease infinite;
+        }
+        @keyframes gradientText { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* ACTIVITY SCREEN */
+        #game-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+            background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.7)), url('image_025c64.jpg');
+            background-size: cover; background-position: center;
+        }
+
+        .stone-panel {
+            background: linear-gradient(145deg, rgba(45, 42, 38, 0.98), rgba(25, 23, 20, 0.98));
+            border: 2px solid var(--stone-border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); border-radius: 12px;
+        }
+
+        /* Thicker bars */
+        .resource-bar-container {
+            background-color: #111; border: 1px solid #444; border-radius: 4px;
+            overflow: hidden; height: 14px; width: 100%; position: relative;
+        }
+        .resource-bar-fill {
+            height: 100%; transition: width 0.5s ease; position: relative;
+        }
+        .threshold-line {
+            position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+            background-color: #ef4444; z-index: 5; box-shadow: 0 0 4px #ef4444;
+        }
+
+        .clan-bar-container {
+            background-color: #1a1814; border: 2px solid #000; border-radius: 6px;
+            overflow: hidden; height: 20px; width: 100%; position: relative; box-shadow: inset 0 2px 5px rgba(0,0,0,0.9);
+        }
+        .clan-bar-fill { 
+            height: 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.5s; position: relative;
+        }
+        .clan-bar-fill::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            background-size: 200% 100%; animation: energyGlow 2s infinite linear;
+        }
+        @keyframes energyGlow { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+        .travel-cost-anim { animation: flashRed 1.5s; }
+        .negative-result-anim { animation: flashRedResult 2s !important; }
+        @keyframes flashRed {
+            0%, 100% { box-shadow: 0 5px 15px rgba(0,0,0,0.8); border-color: var(--stone-border); }
+            50% { box-shadow: 0 0 25px 10px rgba(239, 68, 68, 0.9); border-color: #ef4444; }
+        }
+        @keyframes flashRedResult {
+            0%, 100% { box-shadow: 0 5px 15px rgba(0,0,0,0.8); border-color: var(--stone-border); background-color: rgba(45, 42, 38, 0.98); }
+            20%, 60% { box-shadow: 0 0 35px 15px rgba(239, 68, 68, 0.9); border-color: #ef4444; background-color: rgba(100, 20, 20, 0.98); }
+            40%, 80% { box-shadow: 0 0 15px 5px rgba(239, 68, 68, 0.7); border-color: #ef4444; background-color: rgba(80, 20, 20, 0.98); }
+        }
+
+        #game-arena {
+            position: relative; width: 100%; height: 100%; border-radius: 15px; border: 6px solid #4a3620;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9), inset 0 0 60px rgba(50, 30, 10, 0.7);
+            overflow: hidden; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.2) 100%);
+        }
+
+        /* Enlarged Biomes */
+        .biome-corner {
+            position: absolute; width: 280px; height: 280px; border-radius: 50%;
+            cursor: pointer; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); overflow: hidden; z-index: 10;
+            border: 4px dashed rgba(92, 71, 40, 0.8); box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 8px 15px rgba(0,0,0,0.6); background: rgba(0,0,0,0.3);
+        }
+        .biome-corner:not(.locked):hover { transform: scale(1.05); border-color: #facc15; border-style: solid; box-shadow: 0 0 30px rgba(250, 204, 21, 0.8), inset 0 0 20px rgba(255,255,255,0.2); z-index: 15; }
+        
+        .corner-tl { top: -30px; left: -30px; }
+        .corner-tr { top: -30px; right: -30px; }
+        .corner-bl { bottom: -30px; left: -30px; }
+        .corner-br { bottom: -30px; right: -30px; }
+        
+        .three-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border-radius: 50%; }
+
+        .biome-title {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(to bottom, #ffffff, #d1d5db); color: #1f2937; padding: 6px 16px;
+            border-radius: 15px; font-weight: 900; font-size: 0.95rem; z-index: 20;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.9); pointer-events: none; white-space: nowrap; border: 2px solid #4a3620; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .center-circle {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 180px; height: 180px; background: radial-gradient(circle, rgba(212, 196, 168, 0.95) 0%, rgba(168, 145, 110, 0.95) 100%);
+            border: 4px solid #5c4728; border-radius: 50%; display: grid;
+            grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; padding: 20px; z-index: 30;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .avatar-group {
+            position: absolute; width: 50px; height: 50px; cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s, box-shadow 0.3s; z-index: 40; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 2px;
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,200,200,1) 100%);
+            border-radius: 50%; border: 3px solid #5c4728; box-shadow: inset -3px -3px 8px rgba(0,0,0,0.3), 0 8px 15px rgba(0,0,0,0.7);
+        }
+        
+        #avatar-fuego { top: 15px; left: 15px; border-color: #ef4444; }
+        #avatar-rio { top: 15px; right: 15px; border-color: #3b82f6; }
+        #avatar-cueva { bottom: 15px; left: 15px; border-color: #eab308; }
+        #avatar-viento { bottom: 15px; right: 15px; border-color: #10b981; }
+
+        .avatar-group.disabled { opacity: 0.3; pointer-events: none; filter: grayscale(100%); }
+        .avatar-group:not(.disabled):hover { transform: scale(1.15); box-shadow: 0 10px 20px rgba(0,0,0,0.8); }
+        .avatar-group.selected { border-color: #fff; box-shadow: 0 0 25px #fff; transform: scale(1.2); z-index: 50; }
+        
+        .tribe-member {
+            width: 10px; height: 16px; border-radius: 6px 6px 3px 3px;
+            box-shadow: inset -2px -2px 4px rgba(0,0,0,0.6), inset 2px 2px 4px rgba(255,255,255,0.6), 1px 1px 4px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .tribe-member::before {
+            content: ''; position: absolute; top: -8px; left: 1px; width: 8px; height: 8px; border-radius: 50%;
+            box-shadow: inset -1px -1px 3px rgba(0,0,0,0.6), inset 1px 1px 3px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.4);
+        }
+        
+        #avatar-fuego .tribe-member, #avatar-fuego .tribe-member::before { background: linear-gradient(135deg, #f87171, #b91c1c); }
+        #avatar-rio .tribe-member, #avatar-rio .tribe-member::before { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
+        #avatar-cueva .tribe-member, #avatar-cueva .tribe-member::before { background: linear-gradient(135deg, #facc15, #a16207); }
+        #avatar-viento .tribe-member, #avatar-viento .tribe-member::before { background: linear-gradient(135deg, #34d399, #047857); }
+
+        .talking .tribe-member:nth-child(1) { animation: talk 1.2s infinite alternate ease-in-out; }
+        .talking .tribe-member:nth-child(2) { animation: talk 1.5s infinite alternate-reverse ease-in-out; }
+        .talking .tribe-member:nth-child(3) { animation: talk 1.1s infinite alternate ease-in-out; animation-delay: 0.4s; }
+        
+        @keyframes talk { 0% { transform: translateY(0) scaleY(1) rotate(0deg); } 100% { transform: translateY(-3px) scaleY(1.05) rotate(4deg); } }
+        .walking .tribe-member { animation: walk 0.6s infinite alternate; }
+        @keyframes walk { 0% { transform: translateY(0) rotate(-20deg); } 100% { transform: translateY(-6px) rotate(20deg); } }
+
+        .footprint {
+            position: absolute; width: 18px; height: 18px;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="%232d1f10" opacity="0.8" xmlns="http://www.w3.org/2000/svg"><path d="M12,2C10.3,2 9,3.3 9,5C9,6.7 10.3,8 12,8C13.7,8 15,6.7 15,5C15,3.3 13.7,2 12,2 M7,8C5.3,8 4,9.3 4,11C4,12.7 5.3,14 7,14C8.7,14 10,12.7 10,11C10,9.3 8.7,8 7,8 M17,8C15.3,8 14,9.3 14,11C14,12.7 15.3,14 17,14C18.7,14 20,12.7 20,11C20,9.3 18.7,8 17,8 M12,10C9.8,10 8,11.8 8,14C8,16.6 9.8,20 12,22C14.2,20 16,16.6 16,14C16,11.8 14.2,10 12,10 Z"/></svg>');
+            background-size: contain; background-repeat: no-repeat; z-index: 15; transition: opacity 3s ease-out; pointer-events: none;
+        }
+
+        .modal-overlay { backdrop-filter: blur(10px); background-color: rgba(0, 0, 0, 0.85); transition: opacity 0.4s ease; }
+        .modal-content {
+            background: linear-gradient(135deg, #f5ecd8, #d4c4a8); color: #2d2a26; border: 6px solid #3a2818; border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,1), inset 0 0 30px rgba(255,255,255,0.4); transform: scale(0.95); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); opacity: 1; }
+
+        .sim-phase-anim { display: block; } .sim-phase-result { display: none; }
+        .sim-ready .sim-phase-anim { display: none; } .sim-ready .sim-phase-result { display: block; animation: fadeIn 0.8s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        @keyframes sim-pulse {
+            0% { box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5); }
+            50% { box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 30px rgba(250,204,21,0.9); }
+            100% { box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5); }
+        }
+        #action-simulation-container {
+            width: 100%; height: 240px; background: radial-gradient(circle at center, #2a3b4c, #111827); border-radius: 12px; border: 4px solid #1f2937;
+            margin-bottom: 15px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+            animation: sim-pulse 2s infinite; box-shadow: inset 0 0 40px rgba(0,0,0,0.9);
+        }
+
+        .svg-scene { width: 100%; height: 100%; position: absolute; top:0; left:0; }
+        .spear-anim { animation: flySpear 1.5s infinite ease-in; transform-origin: center; }
+        .mammoth-anim { animation: panicMammoth 2s infinite alternate ease-in-out; transform-origin: bottom center; }
+        @keyframes flySpear { 0% { transform: translate(-200px, 100px) rotate(-20deg); opacity: 0; } 20% { opacity: 1; } 80% { transform: translate(150px, -50px) rotate(10deg); opacity: 1; } 100% { transform: translate(200px, -80px) rotate(20deg); opacity: 0; } }
+        @keyframes panicMammoth { 0% { transform: rotate(-3deg) translateY(0); } 100% { transform: rotate(3deg) translateY(-10px); } }
+
+        .fish-jump { animation: jumpFish 2s infinite cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center; }
+        .water-ripple { animation: rippleEffect 2s infinite linear; transform-origin: center; }
+        .spear-thrust { animation: thrustSpear 2s infinite ease-in-out; transform-origin: top right; }
+        @keyframes jumpFish { 0%, 100% { transform: translateY(100px) rotate(-45deg); opacity: 0; } 50% { transform: translateY(-80px) rotate(0deg); opacity: 1; } }
+        @keyframes rippleEffect { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
+        @keyframes thrustSpear { 0%, 100% { transform: translate(50px, -50px) rotate(45deg); } 50% { transform: translate(-30px, 30px) rotate(45deg); } }
+
+        .berry-drop { animation: fallBerry 1.8s infinite ease-in; }
+        .berry-drop:nth-child(2) { animation-delay: 0.6s; } .berry-drop:nth-child(3) { animation-delay: 1.2s; }
+        .basket-catch { animation: swingBasket 2s infinite alternate ease-in-out; transform-origin: top center; }
+        @keyframes fallBerry { 0% { transform: translateY(-100px); opacity: 0; } 20% { opacity: 1; } 80% { transform: translateY(80px); opacity: 1; } 100% { transform: translateY(120px); opacity: 0; } }
+        @keyframes swingBasket { 0% { transform: translateX(-15px) rotate(-5deg); } 100% { transform: translateX(15px) rotate(5deg); } }
+
+        .dig-tool { animation: digMotion 1.5s infinite ease-in-out; transform-origin: bottom left; }
+        .root-pop { animation: popUpRoot 1.5s infinite cubic-bezier(0.175, 0.885, 0.32, 1.275); transform-origin: bottom center; }
+        @keyframes digMotion { 0%, 100% { transform: rotate(20deg) translate(20px, -20px); } 50% { transform: rotate(-30deg) translate(-20px, 20px); } }
+        @keyframes popUpRoot { 0%, 40% { transform: translateY(50px) scale(0.5); opacity: 0; } 60% { transform: translateY(-10px) scale(1.1); opacity: 1; } 80%, 100% { transform: translateY(0) scale(1); opacity: 1; } }
+
+        .blue-screen-log {
+            background: linear-gradient(180deg, #0f172a, #1e3a8a);
+            border: 3px solid #60a5fa; box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 5px 15px rgba(0,0,0,0.6);
+            color: #93c5fd; font-family: 'Courier New', Courier, monospace; font-size: 0.9rem; font-weight: bold;
+            border-radius: 10px; padding: 10px 15px; text-transform: uppercase; letter-spacing: 1px;
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; position: relative; flex-grow: 1;
+        }
+        .blue-screen-log::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+            pointer-events: none;
+        }
+
+        .weather-overlay { position: absolute; top:0; left:0; right:0; bottom:0; z-index: 5; pointer-events:none; border-radius:50%; }
+        .rain-effect { background: url('data:image/svg+xml;utf8,<svg width="20" height="40" xmlns="http://www.w3.org/2000/svg"><line x1="10" y1="0" x2="10" y2="15" stroke="rgba(150,200,255,0.3)" stroke-width="1.5"/></svg>') repeat; animation: rainAnim 0.8s linear infinite; opacity: 0.6; }
+        .snow-effect { background: radial-gradient(circle, rgba(255,255,255,0.9) 10%, transparent 20%) 0 0 / 25px 25px, radial-gradient(circle, rgba(255,255,255,0.7) 10%, transparent 20%) 12px 12px / 30px 30px; animation: snowAnim 4s linear infinite; opacity: 0.95; }
+        @keyframes rainAnim { 0% { background-position: 0 0; } 100% { background-position: 20px 200px; } }
+        @keyframes snowAnim { 0% { background-position: 0 0, 0 0; } 100% { background-position: 25px 150px, -20px 200px; } }
+
+        .minigame-btn {
+            background: linear-gradient(145deg, #ffffff, #e6e6e6);
+            border: 3px solid #d1d5db; box-shadow: 0 6px 10px rgba(0,0,0,0.15);
+            transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+        }
+        .minigame-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-color: #9ca3af; }
+        .minigame-btn:active { transform: translateY(1px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        .katex-display { margin: 0 !important; }
+
+        #print-section { display: none; }
+        @media print {
+            body, html { overflow: auto; background: white; color: black; display: block; }
+            #ui-layer, #game-bg, #start-screen, #instructions-modal, #simulation-modal, #minigame-modal, #winners-modal { display: none !important; }
+            #print-section { display: block; padding: 20px; font-family: 'Inter', sans-serif; }
+            .page-break { page-break-before: always; }
+            .print-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 25px; }
+            .print-table th, .print-table td { border: 2px solid #000; padding: 12px; text-align: center; font-size: 1rem; }
+            .print-table th { background-color: #ddd; font-weight: bold; }
+            .social-questions h3 { font-size: 1.3rem; margin-top: 15px; margin-bottom: 10px; font-weight: bold; color: #111; }
+            .social-questions p { font-size: 1.1rem; margin-bottom: 10px; line-height: 1.4; }
+            @page { size: A4 portrait; margin: 12mm; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1 class="title-font text-5xl md:text-7xl font-bold mb-4 drop-shadow-[0_8px_8px_rgba(0,0,0,1)] text-center gradient-title">Paleolithic Survival</h1>
+        <div class="text-5xl md:text-6xl mb-6 drop-shadow-[0_5px_10px_rgba(0,0,0,0.8)]">🌋🏕️🦣🌿🍖</div>
+        <p class="text-lg md:text-xl text-stone-200 mb-8 drop-shadow-[0_2px_4px_rgba(0,0,0,1)] text-center max-w-2xl bg-black/60 p-6 rounded-3xl border border-white/10 shadow-2xl">
+            Explore prehistoric biomes, manage your clan's energy, and solve mathematical challenges to survive.<br><br>
+            <strong class="text-amber-400 text-2xl">Calculate your travel distances and fractional calories carefully!</strong>
+        </p>
+        <div class="flex gap-4 z-50 pointer-events-auto">
+            <button onclick="playSound('click'); startGame()" class="bg-gradient-to-r from-green-700 to-green-500 hover:from-green-600 hover:to-green-400 text-white font-black text-2xl py-4 px-10 rounded-full border-4 border-green-900 shadow-[0_0_30px_rgba(34,197,94,0.6)] hover:scale-105 transition-transform">
+                ▶ START CHALLENGE
+            </button>
+            <button onclick="playSound('click'); openInstructions()" class="bg-gradient-to-r from-blue-800 to-blue-600 hover:from-blue-700 hover:to-blue-500 text-white font-bold py-4 px-8 rounded-full border-4 border-blue-900 shadow-xl hover:scale-105 transition-transform flex items-center gap-2 text-xl">
+                <span>📖</span> Instructions
+            </button>
+        </div>
+        
+        <footer class="absolute bottom-4 text-center text-amber-200/80 font-semibold text-sm">
+            Design by David Beleño - Math Education - Social Studies - 7° grade
+        </footer>
+    </div>
+
+    <div id="game-bg"></div>
+
+    <div id="ui-layer" class="relative z-10 flex h-full p-3 gap-3 pointer-events-none" style="display:none;">
+        <div class="w-[70%] flex flex-col pointer-events-auto h-full">
+            <header class="mb-3 flex gap-3">
+                <div id="activity-log" class="blue-screen-log">
+                    > SYSTEM INITIATED. WAITING FOR CLAN DEPARTURES...
+                </div>
+                <button onclick="playSound('click'); window.print()" class="bg-gradient-to-b from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-white font-black py-2 px-6 rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.6)] border-2 border-amber-300 hover:scale-105 transition-transform flex items-center gap-2 text-lg whitespace-nowrap">
+                    <span>📄</span> Download Field Sheet
+                </button>
+            </header>
+
+            <div id="game-arena">
+                <svg id="curved-paths" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 5;" preserveAspectRatio="none" viewBox="0 0 100 100">
+                    <path d="M 50 50 Q 25 50 15 15" stroke="rgba(92, 71, 40, 0.6)" stroke-width="0.8" stroke-dasharray="2 2" fill="none"/>
+                    <path d="M 50 50 Q 75 50 85 15" stroke="rgba(92, 71, 40, 0.6)" stroke-width="0.8" stroke-dasharray="2 2" fill="none"/>
+                    <path d="M 50 50 Q 25 50 15 85" stroke="rgba(92, 71, 40, 0.6)" stroke-width="0.8" stroke-dasharray="2 2" fill="none"/>
+                    <path d="M 50 50 Q 75 50 85 85" stroke="rgba(92, 71, 40, 0.6)" stroke-width="0.8" stroke-dasharray="2 2" fill="none"/>
+                </svg>
+
+                <div id="biome-bayas" class="biome-corner corner-tl" onclick="moveToBiome('bayas', this)">
+                    <div id="scene-bosque" class="three-container"></div>
+                    <div id="weather-bosque" class="weather-overlay rain-effect"></div>
+                    <div class="biome-title">🌿 Berry Forest</div>
+                </div>
+                <div id="biome-pesca" class="biome-corner corner-tr" onclick="moveToBiome('pesca', this)">
+                    <div id="scene-rio" class="three-container"></div>
+                    <div class="biome-title">🐟 Fishing River</div>
+                </div>
+                <div id="biome-caza" class="biome-corner corner-bl" onclick="moveToBiome('caza', this)">
+                    <div id="scene-caza" class="three-container"></div>
+                    <div id="weather-caza" class="weather-overlay snow-effect"></div>
+                    <div class="biome-title">🦣 Big Game Hunting</div>
+                </div>
+                <div id="biome-raices" class="biome-corner corner-br" onclick="moveToBiome('raices', this)">
+                    <div id="scene-raices" class="three-container"></div>
+                    <div class="biome-title">🪵 Gathering Zone</div>
+                </div>
+
+                <div class="center-circle" id="center-base"></div>
+            </div>
+        </div>
+
+        <div class="w-[30%] flex flex-col pointer-events-auto h-full gap-2">
+            <div class="bg-black/85 p-2 rounded-xl border border-stone-500 shadow-2xl text-center">
+                <h2 class="title-font text-lg text-amber-400 mb-0.5 drop-shadow-md">Current Trip</h2>
+                <div class="text-white font-black text-xl bg-stone-800 px-2 py-0.5 rounded-lg border border-stone-400 shadow-inner">
+                    <span id="turn-display">1</span> <span class="text-base text-stone-400">/ 4</span>
+                </div>
+            </div>
+            <div class="stone-panel flex flex-col flex-grow p-2 gap-2 overflow-hidden justify-around" id="clan-panel"></div>
+        </div>
+    </div>
+
+    <!-- PRINT SECTION -->
+    <div id="print-section">
+        <h1 class="title-font" style="font-size: 3.5rem; text-align: center; border-bottom: 3px dashed #333; padding-bottom: 10px; margin-bottom: 20px; color: #b45309;">Field Sheet: Clan __________________</h1>
+        <div style="border: 3px dashed #6b7280; padding: 20px; margin: 20px 0; background: #fdfbf7; border-radius: 10px;">
+            <p style="font-size: 1.3rem; margin:0; text-align: center;"><strong>Initial Energy: $30\frac{1}{2}$</strong> &nbsp;|&nbsp; <strong>Record variable travel costs and caloric gains from the blue log console.</strong></p>
+        </div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Trip</th>
+                    <th>Biome Visited</th>
+                    <th>Calories Gained/Lost (+/-)</th>
+                    <th>Travel Distance Cost (-)</th>
+                    <th>Math Operation (e.g., $30\frac{1}{2} + 2\frac{1}{4} - 4\frac{1}{3}$)</th>
+                    <th>Final Trip Energy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1</td><td></td><td></td><td></td><td></td><td style="padding: 25px;"></td></tr>
+                <tr><td>2</td><td></td><td></td><td></td><td></td><td style="padding: 25px;"></td></tr>
+                <tr><td>3</td><td></td><td></td><td></td><td></td><td style="padding: 25px;"></td></tr>
+                <tr><td>4</td><td></td><td></td><td></td><td></td><td style="padding: 25px;"></td></tr>
+            </tbody>
+        </table>
+        <div class="social-questions" style="margin-top: 40px;">
+            <h3>Reflection Questions - Part I</h3>
+            <p><strong>1. What does this energy surplus represent in the daily life of a nomadic tribe?</strong></p>
+            <hr style="margin-top: 60px; margin-bottom: 30px; border-top: 2px solid #ccc;">
+            <p><strong>2. In what activities do you think the tribe could invest this extra time and energy (e.g., medicine, art) since they weren't searching for food constantly?</strong></p>
+            <hr style="margin-top: 60px; margin-bottom: 30px; border-top: 2px solid #ccc;">
+            <p><strong>3. What decisions did your clan make when choosing which biomes to visit?</strong></p>
+            <hr style="margin-top: 60px; margin-bottom: 30px; border-top: 2px solid #ccc;">
+            
+            <h3 style="margin-top: 40px;">Reflection Questions - Part II</h3>
+            <p><strong>4. If you calculated that traveling a long distance for a small resource left you with a negative balance, how does this explain why hominids had to abandon certain regions or change their diets to avoid extinction?</strong></p>
+            <hr style="margin-top: 60px; margin-bottom: 30px; border-top: 2px solid #ccc;">
+        </div>
+    </div>
+
+    <!-- INSTRUCTIONS MODAL -->
+    <div id="instructions-modal" class="fixed inset-0 z-[3000] flex items-center justify-center hidden modal-overlay p-4 pointer-events-auto">
+        <div class="modal-content animate__animated animate__zoomIn w-full max-w-2xl p-6 relative flex flex-col items-center">
+            <button onclick="playSound('click'); closeModal('instructions-modal')" class="absolute top-3 right-5 text-4xl font-black text-red-600 hover:scale-110 transition drop-shadow-md">&times;</button>
+            <h2 class="title-font text-4xl mb-4 text-amber-900 border-b-4 border-amber-900/40 pb-2 w-full text-center font-bold">Survival Manual</h2>
+            <div id="slide-content" class="text-xl font-medium text-stone-800 text-justify min-h-[180px] flex items-center justify-center mb-6 overflow-y-auto pr-2 px-6 leading-relaxed"></div>
+            <div class="flex gap-6 items-center w-full justify-center">
+                <button onclick="playSound('click'); changeSlide(-1)" class="bg-stone-800 text-white font-bold px-6 py-3 rounded-xl hover:bg-stone-600 transition text-lg shadow-lg border-2 border-stone-900">⬅️ Previous</button>
+                <span id="slide-counter" class="py-2 font-black text-stone-700 text-2xl px-3">1 / 5</span>
+                <button onclick="playSound('click'); changeSlide(1)" class="bg-stone-800 text-white font-bold px-6 py-3 rounded-xl hover:bg-stone-600 transition text-lg shadow-lg border-2 border-stone-900">Next ➡️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTION SIMULATION MODAL -->
+    <div id="simulation-modal" class="fixed inset-0 z-[2000] flex items-center justify-center hidden modal-overlay p-4 pointer-events-auto">
+        <div class="modal-content animate__animated animate__zoomIn w-full max-w-2xl p-8 text-center relative" id="modal-content-box">
+            
+            <div class="sim-phase-anim">
+                <h2 id="action-title" class="title-font text-4xl mb-4 text-stone-900 font-bold drop-shadow-sm">The tribe is acting...</h2>
+                <div id="action-simulation-container"></div>
+                <p class="text-xl text-stone-700 font-bold mt-4 animate-pulse">Calculating effort, distance, and survival...</p>
+            </div>
+
+            <div class="sim-phase-result relative">
+                <div id="sim-icon" class="text-6xl mb-3 drop-shadow-xl">📊</div>
+                <h2 id="sim-title" class="title-font text-5xl font-black mb-3 uppercase text-stone-900 drop-shadow-sm">Trip Result</h2>
+                <p id="sim-desc" class="text-xl text-stone-800 mb-5 font-bold bg-white/60 inline-block px-6 py-2 rounded-xl border-2 border-stone-800/30 shadow-sm">...</p>
+                
+                <div class="bg-gradient-to-r from-gray-100 to-white border-4 border-stone-700 p-6 rounded-2xl mb-6 flex justify-center items-center gap-10 shadow-[inset_0_5px_20px_rgba(0,0,0,0.1)]">
+                    <div class="text-center">
+                        <h3 class="text-lg font-black text-stone-800 mb-2 uppercase tracking-wider">Calories Obtained</h3>
+                        <div id="sim-math" class="text-3xl font-bold drop-shadow-md"></div>
+                    </div>
+                    <div class="border-l-4 border-stone-400 pl-10 text-center">
+                        <h3 class="text-lg font-black text-stone-800 mb-2 uppercase tracking-wider">Travel Cost</h3>
+                        <div id="sim-travel-cost" class="text-3xl text-red-600 font-bold drop-shadow-md"></div>
+                    </div>
+                </div>
+
+                <button onclick="playSound('click'); returnToCamp()" class="bg-gradient-to-b from-stone-700 to-stone-900 hover:from-stone-600 hover:to-stone-800 text-white title-font text-3xl py-3 px-10 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.7)] hover:scale-105 transition mx-auto border-4 border-stone-500 flex items-center gap-3">
+                    <span>🏕️</span> Return to Base
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MINIGAME MODAL -->
+    <div id="minigame-modal" class="fixed inset-0 z-[2500] flex items-center justify-center hidden modal-overlay p-4 pointer-events-auto">
+        <div class="modal-content animate__animated animate__slideInDown w-full max-w-2xl p-6 text-center relative flex flex-col items-center bg-white" style="background: white;">
+            <div class="absolute top-3 right-5 text-3xl font-black text-red-600 flex items-center gap-2">
+                ⏱️ <span id="minigame-timer">60</span>s
+            </div>
+            <h2 class="title-font text-4xl mb-3 text-stone-900 font-bold">Wisdom Challenge</h2>
+            <p class="text-lg text-stone-600 mb-5">Solve quickly for bonus calories (<span id="bonus-katex"></span>)!</p>
+            
+            <div id="minigame-question" class="text-2xl font-black text-stone-800 mb-6 p-4 rounded-xl w-full border-2 border-gray-300 min-h-[120px] flex flex-col items-center justify-center gap-3">
+                <!-- Injected Q -->
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 w-full mb-6" id="minigame-answers"></div>
+
+            <div id="minigame-clan-selector" class="hidden w-full">
+                <p class="text-xl font-bold mb-3 text-green-700">Correct! Select which clan gets the extra points:</p>
+                <div class="flex justify-center gap-4"></div>
+                <button onclick="playSound('click'); skipMinigame()" class="mt-4 text-gray-500 underline text-base">Skip / No award</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WINNERS MODAL -->
+    <div id="winners-modal" class="fixed inset-0 z-[3000] flex items-center justify-center hidden modal-overlay p-4 pointer-events-auto">
+        <div class="modal-content animate__animated animate__tada w-full max-w-2xl p-8 text-center relative flex flex-col items-center">
+            <h2 class="title-font text-5xl mb-4 text-amber-500 font-bold gradient-title">The Age of Survival!</h2>
+            <p class="text-xl text-stone-800 font-bold mb-6">The journeys are over. Let's see who survived the Paleolithic challenge!</p>
+            <div id="winners-list" class="flex flex-col gap-3 w-full mb-6"></div>
+            <button onclick="playSound('click'); closeModal('winners-modal')" class="bg-gradient-to-b from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-white font-black text-2xl py-3 px-10 rounded-full border-4 border-amber-300 shadow-2xl hover:scale-105 transition">Accept Destiny</button>
+        </div>
+    </div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { 
+            if(!audioCtx) audioCtx = new AudioContext(); 
+            if(audioCtx.state === 'suspended') audioCtx.resume(); 
+        }
+        function playSound(type) {
+            if(!audioCtx) return;
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if(type === 'click') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+0.1);
+                osc.start(); osc.stop(audioCtx.currentTime+0.1);
+            } else if(type === 'success') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(400, audioCtx.currentTime); osc.frequency.setValueAtTime(600, audioCtx.currentTime+0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+0.3);
+                osc.start(); osc.stop(audioCtx.currentTime+0.3);
+            } else if(type === 'fail') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(200, audioCtx.currentTime+0.3);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+0.3);
+                osc.start(); osc.stop(audioCtx.currentTime+0.3);
+            } else if(type === 'loading') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.2);
+                osc.start(); osc.stop(audioCtx.currentTime+0.2);
+            }
+        }
+
+        function renderKaTeX(text, useDisplayMode = false) {
+            return text.replace(/\$([^\$]+)\$/g, (match, expr) => {
+                try {
+                    return katex.renderToString(expr, { throwOnError: false, displayMode: useDisplayMode });
+                } catch(e) {
+                    return match;
+                }
+            });
+        }
+
+        const clanes = [
+            { id: 'fuego', nombre: 'Fire Clan', hex: '#ef4444', emoji: '🔥', energy: 30.5, resources: { food: 100, berries: 100, weapons: 100 } },
+            { id: 'rio', nombre: 'River Clan', hex: '#3b82f6', emoji: '💧', energy: 30.5, resources: { food: 100, berries: 100, weapons: 100 } },
+            { id: 'cueva', nombre: 'Cave Clan', hex: '#eab308', emoji: '🪨', energy: 30.5, resources: { food: 100, berries: 100, weapons: 100 } },
+            { id: 'viento', nombre: 'Wind Clan', hex: '#10b981', emoji: '🍃', energy: 30.5, resources: { food: 100, berries: 100, weapons: 100 } }
+        ];
+
+        let clanVisits = { fuego: {}, rio: {}, cueva: {}, viento: {} };
+        let viajesCompletados = 0; let viajeActual = 1; const maxViajes = 4;
+        let maxEnergy = 60; 
+
+        const biomeMessages = {
+            'caza': ["Caught a massive beast!", "The mammoth put up a fight...", "Tracked the herd successfully!", "We hunted a dangerous prey!", "A tough hunt but worth it!"],
+            'pesca': ["Caught a huge salmon!", "The fish were biting today!", "Speared plenty of fish!", "The river was generous today!"],
+            'raices': ["Gathered a rich supply of roots!", "Found sturdy wood for tools.", "Uncovered hidden tubers and herbs.", "Collected enough supplies for days."],
+            'bayas': ["Found a massive bush of sweet berries!", "Picked plenty of wild fruit.", "Filled the baskets with berries!", "A colorful and tasty harvest!"]
+        };
+
+        const randomLogs = [
+            "We had a great journey!", "The path was tough, but we made it.", "Spotted dangerous predators, but avoided them.", 
+            "The weather changed quickly.", "We moved swiftly through the terrain."
+        ];
+
+        // Heavy use of fractions - ensuring minimum whole numbers
+        function getRandomFraction(min, max) {
+            const val = min + Math.random() * (max - min);
+            const whole = Math.floor(val);
+            const fractionParts = [
+                {n: 1, d: 5}, {n: 1, d: 4}, {n: 1, d: 3}, {n: 2, d: 5}, 
+                {n: 1, d: 2}, {n: 3, d: 5}, {n: 2, d: 3}, {n: 3, d: 4}, {n: 4, d: 5}
+            ];
+            
+            let closest = fractionParts[0];
+            let minDiff = 1;
+            const decimalPart = val - whole;
+            
+            fractionParts.forEach(frac => {
+                const dec = frac.n / frac.d;
+                if(Math.abs(decimalPart - dec) < minDiff) { minDiff = Math.abs(decimalPart - dec); closest = frac; }
+            });
+
+            const finalVal = whole + (closest.n / closest.d);
+            let katexStr = "";
+            if (whole === 0) katexStr = `\\frac{${closest.n}}{${closest.d}}`;
+            else katexStr = `${whole}\\frac{${closest.n}}{${closest.d}}`;
+
+            return { val: finalVal, txt: `$${katexStr}$` };
+        }
+
+        function generateBiomeData() {
+            return {
+                'caza': { n: "Big Game Hunting", c: getRandomFraction(6.0, 12.0), gain: getRandomFraction(5.0, 8.0), resType: 'food' },
+                'pesca': { n: "Fishing River", c: getRandomFraction(5.0, 10.0), gain: getRandomFraction(3.0, 7.0), resType: 'food' },
+                'raices': { n: "Gathering Zone", c: getRandomFraction(4.0, 8.0), gain: getRandomFraction(2.0, 5.0), resType: 'weapons' },
+                'bayas': { n: "Berry Forest", c: getRandomFraction(2.0, 6.0), gain: getRandomFraction(1.0, 3.0), resType: 'berries' }
+            };
+        }
+
+        let biomesData = generateBiomeData();
+        let currentTravelCost = null;
+        let currentEnergyUpdate = 0;
+
+        function logAction(msg) {
+            const log = document.getElementById('activity-log');
+            log.innerHTML = `> ${renderKaTeX(msg)}`;
+        }
+
+        function updateResourceBarsUI(clanId) {
+            const clan = clanes.find(c => c.id === clanId);
+            if (!clan) return;
+            ['food', 'berries', 'weapons'].forEach(res => {
+                const fill = document.getElementById(`res-${res}-${clan.id}`);
+                if (fill) {
+                    fill.style.width = `${clan.resources[res]}%`;
+                    if (clan.resources[res] < 50) fill.style.backgroundColor = '#ef4444';
+                    else fill.style.backgroundColor = res === 'food' ? '#f97316' : res === 'berries' ? '#3b82f6' : '#10b981';
+                }
+            });
+        }
+
+        function drainRandomResourceBar(clanId) {
+            const clan = clanes.find(c => c.id === clanId);
+            if (!clan) return;
+            
+            // Deduct fractional points based on condition if below 50%
+            ['food', 'weapons', 'berries'].forEach(res => {
+                if(clan.resources[res] < 50) {
+                    let pen = getRandomFraction(2, 5);
+                    clan.energy -= pen.val;
+                    setTimeout(() => logAction(`[WARNING] Low ${res}! Energy dropped by -${pen.txt}`), Math.random()*1000 + 500);
+                }
+            });
+
+            const resTypes = ['food', 'berries', 'weapons'];
+            const chosen = resTypes[Math.floor(Math.random() * resTypes.length)];
+            const drainAmount = Math.floor(Math.random() * 21) + 25; // keep visual UI percentage as integer
+            clan.resources[chosen] = Math.max(0, clan.resources[chosen] - drainAmount);
+            
+            updateResourceBarsUI(clanId);
+
+            const bar = document.getElementById(`bar-${clan.id}`);
+            let perc = (Math.max(0, Math.min(clan.energy, maxEnergy)) / maxEnergy) * 100;
+            bar.style.width = `${perc}%`;
+        }
+
+        function initUI() {
+            const panel = document.getElementById('clan-panel');
+            const center = document.getElementById('center-base');
+            panel.innerHTML = ''; center.innerHTML = '';
+
+            clanes.forEach(clan => {
+                panel.innerHTML += `
+                    <div class="flex-1 rounded-lg p-1.5 border-2 border-stone-600 shadow-md transition flex flex-col justify-between relative overflow-hidden" id="panel-${clan.id}" style="background: radial-gradient(circle at right, ${clan.hex}40 0%, #1a1814 80%);">
+                        <div class="flex items-center justify-center z-10 w-full mb-1">
+                            <h3 class="font-bold title-font text-lg text-center" style="color: ${clan.hex}; text-shadow: 2px 2px 4px #000;">${clan.emoji} ${clan.nombre}</h3>
+                        </div>
+
+                        <!-- 3 Mini Resource Indicator Bars -->
+                        <div class="flex gap-1 z-10 my-1 bg-black/50 p-1 rounded border border-stone-700">
+                            <div class="flex-1 flex flex-col items-center">
+                                <span class="text-[10px]">🥩</span>
+                                <div class="resource-bar-container">
+                                    <div class="threshold-line"></div>
+                                    <div id="res-food-${clan.id}" class="resource-bar-fill" style="width: 100%; background: #f97316;"></div>
+                                </div>
+                            </div>
+                            <div class="flex-1 flex flex-col items-center">
+                                <span class="text-[10px]">🫐</span>
+                                <div class="resource-bar-container">
+                                    <div class="threshold-line"></div>
+                                    <div id="res-berries-${clan.id}" class="resource-bar-fill" style="width: 100%; background: #3b82f6;"></div>
+                                </div>
+                            </div>
+                            <div class="flex-1 flex flex-col items-center">
+                                <span class="text-[10px]">🗡️</span>
+                                <div class="resource-bar-container">
+                                    <div class="threshold-line"></div>
+                                    <div id="res-weapons-${clan.id}" class="resource-bar-fill" style="width: 100%; background: #10b981;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Clan Energy Bar -->
+                        <div class="clan-bar-container z-10">
+                            <div id="bar-${clan.id}" class="clan-bar-fill" style="width: 50%; background-color: ${clan.hex}; box-shadow: 0 0 10px ${clan.hex};"></div>
+                        </div>
+                    </div>`;
+
+                center.innerHTML += `
+                    <div class="avatar-group talking" id="avatar-${clan.id}" onclick="selectAvatar('${clan.id}')">
+                        <div class="tribe-member mt-1.5"></div><div class="tribe-member mt-1.5"></div><div class="tribe-member mt-1.5"></div>
+                    </div>`;
+            });
+            
+            // Pre-render math inside the print area
+            document.getElementById('print-section').innerHTML = renderKaTeX(document.getElementById('print-section').innerHTML);
+        }
+
+        const renderers = []; const animators = []; const scenesInfo = [];
+        
+        function initThreeScene(containerId, setupSceneFunc) {
+            const container = document.getElementById(containerId);
+            const scene = new THREE.Scene();
+            const aspect = container.clientWidth / container.clientHeight;
+            const d = 5;
+            const camera = new THREE.OrthographicCamera(-d*aspect, d*aspect, d, -d, 1, 100);
+            camera.position.set(10, 10, 10); camera.lookAt(scene.position);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            
+            const ambLight = new THREE.AmbientLight(0xffffff, 0.9); scene.add(ambLight);
+            const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(5,15,5); scene.add(dl);
+            
+            const baseGeo = new THREE.CylinderGeometry(5.8, 5.8, 1, 64);
+            const animateFunc = setupSceneFunc(scene, baseGeo);
+            
+            scenesInfo.push({ id: containerId, scene, ambLight });
+            animators.push(() => { animateFunc(); renderer.render(scene, camera); });
+        }
+
+        function createPine(x, z, scale) {
+            const group = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 1), new THREE.MeshLambertMaterial({color: 0x3e2723})); trunk.position.y = 0.5;
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(1, 2.5, 8), new THREE.MeshLambertMaterial({color: 0x1b5e20})); leaves.position.y = 1.6;
+            group.add(trunk, leaves); group.position.set(x, 0, z); group.scale.set(scale, scale, scale); return group;
+        }
+
+        function createDeciduousTree(x, z, scale) {
+            const group = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.2), new THREE.MeshLambertMaterial({color: 0x4a2e18})); trunk.position.y = 0.6;
+            const foliage = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), new THREE.MeshLambertMaterial({color: 0x2d6a4f})); foliage.position.y = 1.8;
+            group.add(trunk, foliage); group.position.set(x, 0, z); group.scale.set(scale, scale, scale); return group;
+        }
+
+        function createRock(x, z, scale) {
+            const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5 + Math.random()*0.3), new THREE.MeshLambertMaterial({color: 0x64748b}));
+            rock.position.set(x, 0.25*scale, z); rock.scale.set(scale, scale*0.8, scale); return rock;
+        }
+
+        function createMountain(x, z, scale) {
+            const mnt = new THREE.Mesh(new THREE.ConeGeometry(2.5, 5.5, 5), new THREE.MeshLambertMaterial({color: 0x5c5c5c}));
+            mnt.position.set(x, 2.5*scale, z); mnt.scale.set(scale, scale, scale); return mnt;
+        }
+
+        function createMammoth(x, z, scale) {
+            const g = new THREE.Group(); const mat = new THREE.MeshLambertMaterial({color: 0x5d4037});
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 1.1), mat); body.position.y = 0.65;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), mat); head.position.set(1.0, 0.8, 0);
+            const tuskMat = new THREE.MeshLambertMaterial({color: 0xfff3e0});
+            const tusk1 = new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.0), tuskMat); tusk1.position.set(1.5, 0.5, 0.3); tusk1.rotation.z = -Math.PI/2.5;
+            const tusk2 = new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.0), tuskMat); tusk2.position.set(1.5, 0.5, -0.3); tusk2.rotation.z = -Math.PI/2.5;
+            g.add(body, head, tusk1, tusk2); g.position.set(x, 0, z); g.scale.set(scale, scale, scale); return g;
+        }
+
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = '0';
+            document.getElementById('start-screen').style.pointerEvents = 'none';
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('ui-layer').style.display = 'flex';
+                initUI(); initAllScenes();
+            }, 1000);
+        }
+
+        function initAllScenes() {
+            initThreeScene('scene-bosque', (scene, baseGeo) => {
+                const base = new THREE.Mesh(baseGeo, new THREE.MeshLambertMaterial({color: 0x2e7d32}));
+                base.position.y = -0.5; scene.add(base);
+                for(let i=0; i<14; i++) scene.add(createPine(Math.random()*8-4, Math.random()*8-4, 0.6 + Math.random()*0.6));
+                const bushes = new THREE.Group();
+                const berryColors = [0xe53935, 0x1e88e5, 0xffffff]; 
+                for(let i=0; i<30; i++){ 
+                    const bush = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshLambertMaterial({color: 0x1b5e20}));
+                    const dec = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshLambertMaterial({color: berryColors[Math.floor(Math.random()*berryColors.length)]}));
+                    dec.position.set(0.15, 0.25, 0.15); bush.add(dec); bush.position.set(Math.random()*9-4.5, 0.15, Math.random()*9-4.5); bushes.add(bush);
+                }
+                scene.add(bushes); return () => { bushes.children.forEach(b => b.rotation.y += 0.003); };
+            });
+
+            initThreeScene('scene-rio', (scene, baseGeo) => {
+                const base = new THREE.Mesh(baseGeo, new THREE.MeshLambertMaterial({color: 0x689f38})); base.position.y = -0.5; scene.add(base);
+                const riverGeo = new THREE.PlaneGeometry(6, 14, 20, 20); 
+                const river = new THREE.Mesh(riverGeo, new THREE.MeshPhongMaterial({color: 0x0284c7, transparent: true, opacity: 0.85, shininess: 100}));
+                river.rotation.x = -Math.PI/2; river.position.y = 0.6; scene.add(river);
+                
+                for(let i=0; i<12; i++) {
+                    const rx = (Math.random() > 0.5 ? 1 : -1) * (1.8 + Math.random()*2.0);
+                    const rz = Math.random()*10 - 5;
+                    scene.add(createRock(rx, rz, 0.6 + Math.random()*0.5));
+                }
+
+                const fishes = [];
+                for(let i=0; i<10; i++){ 
+                    const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.5, 4), new THREE.MeshLambertMaterial({color: 0xf97316}));
+                    body.rotation.x = Math.PI/2; g.add(body); g.position.set((Math.random()*3)-1.5, 0.4, Math.random()*10-5); scene.add(g); fishes.push(g);
+                }
+                return () => {
+                    const time = Date.now() * 0.0025; const pos = riverGeo.attributes.position;
+                    for(let i=0; i<pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i)*3 + time)*0.4 + Math.cos(pos.getY(i)*2 + time)*0.2);
+                    pos.needsUpdate = true;
+                    fishes.forEach((f, idx) => { f.position.z -= 0.04; if(f.position.z < -7) f.position.z = 7; f.position.x += Math.sin(time*3 + idx)*0.03; });
+                };
+            });
+
+            initThreeScene('scene-caza', (scene, baseGeo) => {
+                const base = new THREE.Mesh(baseGeo, new THREE.MeshLambertMaterial({color: 0xd7ccc8})); base.position.y = -0.5; scene.add(base);
+                
+                scene.add(createMountain(-3, -3, 1.2));
+                scene.add(createMountain(0, -5, 1.8));
+                scene.add(createMountain(3, -2.5, 1.1));
+                scene.add(createMountain(-1, -2, 1.0));
+
+                const m1 = createMammoth(-1.2, 0.5, 0.85);
+                const m2 = createMammoth(1.5, -1.0, 0.75);
+                scene.add(m1, m2);
+
+                return () => { 
+                    m1.position.z += Math.sin(Date.now()*0.001)*0.012; 
+                    m2.position.z += Math.cos(Date.now()*0.001)*0.01; 
+                };
+            });
+
+            initThreeScene('scene-raices', (scene, baseGeo) => {
+                const base = new THREE.Mesh(baseGeo, new THREE.MeshLambertMaterial({color: 0x556b2f})); base.position.y = -0.5; scene.add(base);
+                for(let i=0; i<8; i++) {
+                    scene.add(createDeciduousTree(Math.random()*8-4, Math.random()*8-4, 0.7 + Math.random()*0.4));
+                }
+                for(let i=0; i<10; i++) {
+                    scene.add(createRock(Math.random()*8-4, Math.random()*8-4, 0.5));
+                }
+                return () => {};
+            });
+
+            function animateThree() { requestAnimationFrame(animateThree); animators.forEach(a => a()); }
+            animateThree();
+        }
+
+        let selectedClan = null; let isAnimating = false; let footprintInterval;
+
+        function getJobAnimationHTML(key) {
+            if(key === 'pesca') return `<svg class="svg-scene" viewBox="0 0 200 200"><defs><linearGradient id="waterGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#38bdf8;stop-opacity:0.8" /><stop offset="100%" style="stop-color:#0284c7;stop-opacity:0.9" /></linearGradient></defs><rect x="0" y="100" width="200" height="100" fill="url(#waterGrad)" opacity="0.5"/><circle cx="100" cy="150" r="40" fill="none" stroke="#e0f2fe" stroke-width="4" class="water-ripple" opacity="0"/><g class="spear-thrust"><line x1="150" y1="20" x2="90" y2="130" stroke="#78350f" stroke-width="6"/><polygon points="90,130 80,145 95,135" fill="#451a03"/></g><g class="fish-jump"><path d="M 80,180 Q 60,120 100,100 Q 140,120 120,180 Z" fill="#f97316"/><polygon points="120,150 140,140 130,170" fill="#f97316"/><circle cx="95" cy="115" r="3" fill="black"/></g></svg>`;
+            if(key === 'caza') return `<svg class="svg-scene" viewBox="0 0 200 200"><g class="mammoth-anim"><path d="M 40,160 Q 80,90 140,160 Z" fill="#451a03"/><circle cx="120" cy="110" r="25" fill="#451a03"/><path d="M 130,120 Q 160,160 140,180" fill="none" stroke="#451a03" stroke-width="12" stroke-linecap="round"/><path d="M 140,110 Q 180,90 170,60" fill="none" stroke="#fcd34d" stroke-width="6" stroke-linecap="round"/></g><g class="spear-anim"><line x1="200" y1="200" x2="140" y2="140" stroke="#b45309" stroke-width="5"/><polygon points="140,140 125,125 145,135" fill="#78350f"/></g></svg>`;
+            if(key === 'bayas') return `<svg class="svg-scene" viewBox="0 0 200 200"><path d="M 40,120 Q 100,20 160,120 Z" fill="#15803d"/><g class="basket-catch"><path d="M 70,160 Q 100,200 130,160 Z" fill="#d97706"/><line x1="70" y1="160" x2="130" y2="160" stroke="#b45309" stroke-width="4"/></g><circle cx="100" cy="50" r="10" fill="#ef4444" class="berry-drop"/><circle cx="70" cy="40" r="12" fill="#3b82f6" class="berry-drop"/><circle cx="130" cy="60" r="9" fill="#eab308" class="berry-drop"/><circle cx="110" cy="80" r="11" fill="#ef4444" class="berry-drop"/></svg>`;
+            if(key === 'raices') return `<svg class="svg-scene" viewBox="0 0 200 200"><rect x="0" y="150" width="200" height="50" fill="#3e2723"/><path d="M 20,150 L 180,150" stroke="#5d4037" stroke-width="15"/><g class="dig-tool"><line x1="120" y1="50" x2="80" y2="150" stroke="#5c4728" stroke-width="8"/><polygon points="80,150 60,160 90,165" fill="#78350f"/></g><g class="root-pop"><path d="M 85,150 Q 100,90 115,150 Z" fill="#a16207"/><path d="M 100,90 Q 80,60 100,50 Q 120,60 100,90" fill="#4d7c0f"/></g></svg>`;
+            return '';
+        }
+
+        function updateBiomeLockUI() {
+            document.querySelectorAll('.biome-corner').forEach(b => {
+                b.classList.remove('locked', 'grayscale', 'opacity-50');
+                b.style.pointerEvents = 'auto';
+            });
+            if(!selectedClan) return;
+            for(let key in biomesData) {
+                if((clanVisits[selectedClan][key] || 0) >= 2) {
+                    const b = document.getElementById(`biome-${key}`);
+                    if(b) { b.classList.add('locked', 'grayscale', 'opacity-50'); b.style.pointerEvents = 'none'; }
+                }
+            }
+        }
+
+        function selectAvatar(clanId) {
+            const avatar = document.getElementById(`avatar-${clanId}`);
+            if (isAnimating || avatar.classList.contains('disabled')) return;
+            playSound('click');
+            document.querySelectorAll('.avatar-group').forEach(a => a.classList.remove('selected'));
+            selectedClan = clanId; avatar.classList.add('selected');
+            updateBiomeLockUI();
+        }
+
+        function dropFootprint(avatar) {
+            const board = document.getElementById('game-arena'); const aRect = avatar.getBoundingClientRect(); const bRect = board.getBoundingClientRect();
+            const fp = document.createElement('div'); fp.className = 'footprint';
+            fp.style.left = (aRect.left - bRect.left + aRect.width/2 + (Math.random()*10-5)) + 'px';
+            fp.style.top = (aRect.top - bRect.top + aRect.height/2 + (Math.random()*10-5)) + 'px';
+            board.appendChild(fp); setTimeout(() => fp.style.opacity = '0', 800); setTimeout(() => fp.remove(), 3500);
+        }
+
+        function moveToBiome(biomeKey, target) {
+            if (!selectedClan || target.classList.contains('locked') || isAnimating) return; 
+            isAnimating = true; playSound('click');
+
+            biomesData = generateBiomeData();
+            clanVisits[selectedClan][biomeKey] = (clanVisits[selectedClan][biomeKey] || 0) + 1;
+            currentTravelCost = biomesData[biomeKey].c;
+
+            const clanObj = clanes.find(c=>c.id===selectedClan);
+            const randomMsg = randomLogs[Math.floor(Math.random() * randomLogs.length)];
+            logAction(`[${clanObj.nombre}] Travel to ${biomesData[biomeKey].n}. ${randomMsg}`);
+
+            const avatar = document.getElementById(`avatar-${selectedClan}`);
+            const panel = document.getElementById(`panel-${selectedClan}`);
+            
+            panel.classList.add('travel-cost-anim'); setTimeout(() => panel.classList.remove('travel-cost-anim'), 1500);
+            avatar.classList.remove('talking'); avatar.classList.add('walking');
+
+            const aRect = avatar.getBoundingClientRect(); const tRect = target.getBoundingClientRect();
+            const dX = (tRect.left + tRect.width/2) - (aRect.left + aRect.width/2);
+            const dY = (tRect.top + tRect.height/2) - (aRect.top + aRect.height/2);
+
+            avatar.style.transition = "transform 4s cubic-bezier(0.45, 0.05, 0.55, 0.95)";
+            avatar.style.transform = `translate(${dX}px, ${dY}px) scale(0.6)`; avatar.style.zIndex = "100";
+
+            let steps = 0;
+            footprintInterval = setInterval(() => {
+                dropFootprint(avatar); if(steps % 2 === 0) playSound('loading'); steps++;
+            }, 400);
+
+            setTimeout(() => {
+                clearInterval(footprintInterval); avatar.classList.remove('walking'); triggerSimulation(biomeKey, clanObj);
+            }, 4000);
+        }
+
+        function triggerSimulation(key, clanObj) {
+            const data = biomesData[key];
+            const modalBox = document.getElementById('modal-content-box');
+            modalBox.classList.remove('sim-ready'); 
+            
+            // 30% chance for negative outcome
+            const isNegativeOutcome = Math.random() < 0.3;
+            let negativeMsg = "";
+            
+            if (isNegativeOutcome) {
+                data.gain = { val: 0, txt: "$0$" };
+                const negMessages = {
+                    'caza': ["A Sabertooth attacked! Escaped with no meat.", "The mammoth charged us! Dropped all tools.", "Hunters were injured!"],
+                    'pesca': ["A crocodile destroyed the nets!", "The river was dangerously flooded today.", "A flash flood washed away the catch!"],
+                    'raices': ["Found only poisonous and rotten roots!", "A rival clan chased us away.", "All gathering tools broke!"],
+                    'bayas': ["The berries were poisonous!", "A bear ate the entire bush!", "A swarm of insects attacked!"]
+                };
+                negativeMsg = negMessages[key][Math.floor(Math.random() * negMessages[key].length)];
+            } else {
+                if (data.resType && clanObj.resources[data.resType] !== undefined) {
+                    clanObj.resources[data.resType] = 100; updateResourceBarsUI(clanObj.id);
+                }
+            }
+
+            document.getElementById('action-simulation-container').innerHTML = getJobAnimationHTML(key);
+            
+            if (isNegativeOutcome) {
+                document.getElementById('sim-desc').innerHTML = `<span class="text-red-700 uppercase font-black">⚠️ DANGER:</span> ${negativeMsg}`;
+                document.getElementById('sim-math').innerHTML = renderKaTeX(`+ 0`);
+                document.getElementById('sim-math').className = "text-3xl text-red-600 font-bold drop-shadow-md";
+            } else {
+                const msgs = biomeMessages[key];
+                document.getElementById('sim-desc').innerHTML = msgs[Math.floor(Math.random() * msgs.length)];
+                document.getElementById('sim-math').innerHTML = renderKaTeX(`+ ${data.gain.txt}`);
+                document.getElementById('sim-math').className = "text-3xl text-green-700 font-bold drop-shadow-md";
+            }
+            
+            document.getElementById('sim-travel-cost').innerHTML = renderKaTeX(`- ${data.c.txt}`);
+
+            currentEnergyUpdate = data.gain.val;
+
+            const modal = document.getElementById('simulation-modal');
+            modal.classList.remove('hidden'); setTimeout(() => modal.classList.add('active'), 10);
+            
+            setTimeout(() => { modalBox.classList.add('sim-ready'); if(!isNegativeOutcome) playSound('success'); else playSound('fail'); }, 3500);
+        }
+
+        function returnToCamp() {
+            const modal = document.getElementById('simulation-modal');
+            modal.classList.remove('active'); setTimeout(() => modal.classList.add('hidden'), 400);
+            
+            const clanObj = clanes.find(c=>c.id===selectedClan);
+            logAction(`[${clanObj.nombre}] Returning (Cost: -${currentTravelCost.txt})...`);
+
+            const avatar = document.getElementById(`avatar-${selectedClan}`);
+            const panel = document.getElementById(`panel-${selectedClan}`);
+            
+            panel.classList.add('travel-cost-anim'); setTimeout(() => panel.classList.remove('travel-cost-anim'), 1500);
+
+            avatar.classList.add('walking');
+            avatar.style.transition = "transform 4s cubic-bezier(0.45, 0.05, 0.55, 0.95)"; avatar.style.transform = `translate(0px, 0px) scale(1)`;
+            
+            let steps = 0;
+            footprintInterval = setInterval(() => { dropFootprint(avatar); if(steps % 2 === 0) playSound('loading'); steps++; }, 400);
+            
+            setTimeout(() => {
+                clearInterval(footprintInterval);
+                avatar.classList.remove('walking'); avatar.classList.add('talking');
+                avatar.classList.remove('selected'); avatar.classList.add('disabled'); avatar.style.zIndex = "40";
+                
+                let netResult = currentEnergyUpdate - currentTravelCost.val;
+                clanObj.energy = clanObj.energy + netResult; 
+                
+                if(netResult < 0) {
+                    panel.classList.add('negative-result-anim'); setTimeout(() => panel.classList.remove('negative-result-anim'), 2000);
+                    playSound('fail');
+                } else { playSound('success'); }
+                
+                drainRandomResourceBar(clanObj.id);
+
+                const bar = document.getElementById(`bar-${selectedClan}`);
+                let perc = (Math.max(0, Math.min(clanObj.energy, maxEnergy)) / maxEnergy) * 100;
+                bar.style.width = `${perc}%`;
+                if(perc < 25) bar.style.backgroundColor = '#dc2626'; else bar.style.backgroundColor = clanObj.hex;
+
+                selectedClan = null; isAnimating = false;
+                updateBiomeLockUI(); viajesCompletados++; checkTurnos();
+            }, 4000);
+        }
+
+        let minigameInterval; let minigameTimeLeft = 60;
+
+        // Visual fraction components
+        function createFractionBar(n, d, color='#f97316') {
+            let html = `<div class="inline-flex border-2 border-stone-800 rounded-md overflow-hidden shadow-sm align-middle mx-3" style="height: 35px; width: ${d * 30}px;">`;
+            for(let i=0; i<d; i++) {
+                html += `<div style="flex: 1; border-right: ${i<d-1 ? '2px solid #444' : 'none'}; background-color: ${i<n ? color : '#e5e7eb'};"></div>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function generateMathProblem() {
+            // Fraction problems including standard math and graphic representations
+            const fractionProblems = [
+                { q: `1\\frac{2}{3} + (-2\\frac{1}{6})`, a: ["-\\frac{1}{2}", "\\frac{1}{2}", "-1\\frac{1}{3}", "1\\frac{1}{6}"], c: 0 },
+                { q: `\\frac{2}{5} + (\\frac{-4}{15}) + \\frac{1}{10}`, a: ["\\frac{7}{30}", "\\frac{1}{5}", "-\\frac{1}{15}", "\\frac{11}{30}"], c: 0 },
+                { q: `2\\frac{1}{4} - 4\\frac{2}{3}`, a: ["-2\\frac{5}{12}", "-2\\frac{1}{12}", "2\\frac{5}{12}", "-1\\frac{7}{12}"], c: 0 },
+                { q: `-2\\frac{3}{5} \\cdot (-1\\frac{1}{4})`, a: ["3\\frac{1}{4}", "-3\\frac{1}{4}", "2\\frac{3}{20}", "3\\frac{3}{5}"], c: 0 },
+                { q: `\\frac{-5\\frac{1}{3}}{-2\\frac{2}{5}}`, a: ["2\\frac{2}{9}", "-2\\frac{2}{9}", "1\\frac{4}{5}", "2\\frac{1}{3}"], c: 0 },
+                { q: `4\\frac{1}{5} - (-1\\frac{2}{5})`, a: ["5\\frac{3}{5}", "3\\frac{1}{5}", "5\\frac{1}{5}", "2\\frac{4}{5}"], c: 0 },
+                
+                // Graphic fraction questions
+                { q: `<div class="text-lg text-gray-700 mb-2">Combine the gathered resources:</div><div class="flex items-center">${createFractionBar(3, 8, '#10b981')} $\\mathbf{+}$ ${createFractionBar(2, 8, '#10b981')}</div>`, a: ["\\frac{5}{8}", "\\frac{1}{8}", "\\frac{6}{8}", "\\frac{5}{16}"], c: 0 },
+                { q: `<div class="text-lg text-gray-700 mb-2">Calculate the remaining meat after eating:</div><div class="flex items-center">${createFractionBar(5, 6, '#ef4444')} $\\mathbf{-}$ ${createFractionBar(1, 6, '#ef4444')}</div>`, a: ["\\frac{2}{3}", "\\frac{4}{12}", "\\frac{1}{3}", "\\frac{5}{6}"], c: 0 },
+                { q: `<div class="text-lg text-gray-700 mb-2">Total berries gathered from two bushes:</div><div class="flex items-center">${createFractionBar(1, 4, '#3b82f6')} $\\mathbf{+}$ ${createFractionBar(3, 8, '#3b82f6')}</div>`, a: ["\\frac{5}{8}", "\\frac{4}{12}", "\\frac{4}{8}", "\\frac{1}{2}"], c: 0 }
+            ];
+            return fractionProblems[Math.floor(Math.random() * fractionProblems.length)];
+        }
+
+        function startMinigame() {
+            logAction("WISDOM CHALLENGE INITIATED. SOLVE FOR BONUS CALORIES.");
+            playSound('loading');
+            const modal = document.getElementById('minigame-modal');
+            const qObj = generateMathProblem(); 
+            
+            document.getElementById('bonus-katex').innerHTML = renderKaTeX(`+ 2\\frac{1}{4}`);
+            
+            // Check if string has HTML to render safely with KaTeX
+            if (qObj.q.includes("<div")) {
+                document.getElementById('minigame-question').innerHTML = renderKaTeX(qObj.q, true);
+            } else {
+                document.getElementById('minigame-question').innerHTML = "Evaluate: " + renderKaTeX(`$${qObj.q}$`, true);
+            }
+            
+            let answers = [...qObj.a].map((val, idx) => ({val, idx: idx===qObj.c}));
+            answers.sort(() => Math.random() - 0.5);
+
+            const ansContainer = document.getElementById('minigame-answers');
+            ansContainer.innerHTML = '';
+            answers.forEach(ans => {
+                const btn = document.createElement('button');
+                btn.className = 'minigame-btn text-xl font-bold text-stone-800 py-3 px-4 rounded-xl';
+                btn.innerHTML = renderKaTeX(`$${ans.val}$`, true);
+                btn.onclick = () => { playSound('click'); handleMinigameAnswer(ans.idx); };
+                ansContainer.appendChild(btn);
+            });
+
+            document.getElementById('minigame-answers').classList.remove('hidden');
+            document.getElementById('minigame-clan-selector').classList.add('hidden');
+            
+            minigameTimeLeft = 60; document.getElementById('minigame-timer').innerText = minigameTimeLeft;
+            modal.classList.remove('hidden'); setTimeout(()=>modal.classList.add('active'),10);
+
+            minigameInterval = setInterval(() => {
+                minigameTimeLeft--; document.getElementById('minigame-timer').innerText = minigameTimeLeft;
+                if(minigameTimeLeft <= 0) { clearInterval(minigameInterval); playSound('fail'); skipMinigame(); }
+            }, 1000);
+        }
+
+        function handleMinigameAnswer(isCorrect) {
+            clearInterval(minigameInterval);
+            if(isCorrect) {
+                playSound('success');
+                document.getElementById('minigame-answers').classList.add('hidden');
+                document.getElementById('minigame-clan-selector').classList.remove('hidden');
+                
+                const selector = document.querySelector('#minigame-clan-selector .flex');
+                selector.innerHTML = '';
+                clanes.forEach(clan => {
+                    selector.innerHTML += `
+                        <button onclick="awardBonus('${clan.id}')" class="flex flex-col items-center p-2 rounded-xl hover:bg-green-100 border-2 border-green-300 transition shadow-sm">
+                            <span class="text-3xl drop-shadow-md">${clan.emoji}</span>
+                            <span class="font-bold text-sm mt-1" style="color:${clan.hex}">${clan.nombre}</span>
+                        </button>`;
+                });
+            } else {
+                playSound('fail'); setTimeout(() => skipMinigame(), 500);
+            }
+        }
+
+        function createFloatingBonus(clanId, txt) {
+            const panel = document.getElementById(`panel-${clanId}`);
+            const floating = document.createElement('div');
+            floating.className = 'absolute text-green-400 font-black text-2xl z-50 animate__animated animate__fadeOutUp';
+            floating.style.left = '50%'; floating.style.top = '50%'; floating.style.transform = 'translate(-50%, -50%)';
+            floating.style.textShadow = '0 0 8px black';
+            floating.innerHTML = renderKaTeX(txt);
+            panel.appendChild(floating);
+            setTimeout(() => floating.remove(), 1200);
+        }
+
+        function awardBonus(clanId) {
+            playSound('success');
+            const clan = clanes.find(c => c.id === clanId);
+            clan.energy += 2.25; 
+            logAction(`[${clan.nombre}] Won the wisdom challenge! Bonus +2 1/4 calories.`);
+            
+            const bar = document.getElementById(`bar-${clan.id}`);
+            let perc = (Math.max(0, Math.min(clan.energy, maxEnergy)) / maxEnergy) * 100;
+            bar.style.width = `${perc}%`;
+
+            createFloatingBonus(clanId, "+ 2\\frac{1}{4}");
+
+            closeModal('minigame-modal'); setTimeout(triggerRandomEvent, 1500);
+        }
+
+        function skipMinigame() {
+            clearInterval(minigameInterval); logAction("Wisdom challenge ended without award.");
+            closeModal('minigame-modal'); triggerRandomEvent();
+        }
+
+        function triggerRandomEvent() {
+            const events = [
+                { f: (c) => `${c.nombre} is low on tools! Visiting the Gathering Zone is recommended.` },
+                { f: (c) => `${c.nombre} needs large pelts! Big Game Hunting is suggested.` },
+                { f: (c) => `A scout saw fish jumping! ${c.nombre} should visit the Fishing River.` }
+            ];
+            const event = events[Math.floor(Math.random() * events.length)];
+            const rClan = clanes[Math.floor(Math.random() * clanes.length)];
+            logAction(`[RANDOM EVENT] ${event.f(rClan)}`); continueNextTurn();
+        }
+
+        function checkTurnos() {
+            if (viajesCompletados >= 4) {
+                viajesCompletados = 0; viajeActual++;
+                if(viajeActual > maxViajes) {
+                    logAction("TRIPS COMPLETED. CHECKING SURVIVAL."); setTimeout(showWinners, 1000); return;
+                }
+                setTimeout(startMinigame, 1000);
+            }
+        }
+
+        function continueNextTurn() {
+            document.getElementById('turn-display').innerText = `${viajeActual}`;
+            clanes.forEach(c => document.getElementById(`avatar-${c.id}`).classList.remove('disabled'));
+            logAction(`STARTING TRIP ${viajeActual}. CHOOSE WISELY.`);
+        }
+
+        function showWinners() {
+            playSound('success');
+            const list = document.getElementById('winners-list');
+            list.innerHTML = '';
+            clanes.forEach(c => {
+                const survived = c.energy > 0;
+                list.innerHTML += `
+                    <div class="flex items-center justify-between bg-stone-100 p-3 rounded-xl border-2 ${survived ? 'border-green-500' : 'border-red-500'}">
+                        <span class="text-2xl">${c.emoji}</span>
+                        <span class="text-xl font-bold" style="color:${c.hex}">${c.nombre}</span>
+                        <span class="text-xl font-black ${survived ? 'text-green-600' : 'text-red-600'}">${survived ? 'Survived!' : 'Perished'}</span>
+                    </div>`;
+            });
+            const m = document.getElementById('winners-modal'); m.classList.remove('hidden'); setTimeout(()=>m.classList.add('active'),10);
+        }
+
+        const ins = [
+            { t: "1. Paleolithic Survival Rules", d: "The environment dictates your tribe's fate. They need food and resources. Choose to gather, hunt, or fish. Traveling drains your clan's energy significantly based on distance." },
+            { t: "2. The Blue Log Console", d: "The blue log console tracks all clan departures and variable travel costs. Pay close attention and write down the mixed fractions on your sheet." },
+            { t: "3. Distances & Resource Indicators", d: "Each clan has 3 small resource bars (Food 🥩, Berries 🫐, Weapons 🗡️). They drain each turn! Cross below the red safety line and you lose extra fractional calories. Visit the corresponding biome to refill them!" },
+            { t: "4. Variable Distances & Gains", d: "Big Game Hunting provides the largest caloric gains ($5$ to $8\\frac{1}{5}$) but requires traveling long distances ($6$ to $12\\frac{1}{5}$). Calculate risks carefully. Beware of Sabertooth attacks!" },
+            { t: "5. Wisdom Challenge", d: "After each full trip round, answer a math question. When answered correctly, select which clan receives the bonus calories ($+2\\frac{1}{4}$)!" }
+        ];
+        
+        let cSlide = 0;
+        function updSlide() {
+            document.getElementById('slide-content').innerHTML = `<div class="w-full animate__animated animate__fadeIn"><h3 class="text-2xl font-black mb-4 text-amber-900 title-font border-b-2 border-amber-900/20 pb-2">${ins[cSlide].t}</h3><p class="text-lg leading-relaxed text-stone-800">${ins[cSlide].d}</p></div>`;
+            document.getElementById('slide-counter').innerText = `${cSlide+1} / ${ins.length}`;
+            const container = document.getElementById('slide-content'); container.innerHTML = renderKaTeX(container.innerHTML);
+        }
+        function changeSlide(d) { cSlide = (cSlide+d+ins.length)%ins.length; updSlide(); }
+        function openInstructions() { cSlide=0; updSlide(); const m = document.getElementById('instructions-modal'); m.classList.remove('hidden'); setTimeout(()=>m.classList.add('active'),10); }
+        function closeModal(id) { const m = document.getElementById(id); m.classList.remove('active'); setTimeout(()=>m.classList.add('hidden'),400); }
+    </script>
+</body>
+</html>
